@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="A Visual Experiment with building permit data from the City of Nashville">
+    <meta name="author" content="Chris Vincent">
+    <link rel="icon" href="../../favicon.ico">
+
+    <title>ConstruXn Na$hVega$</title>
+
+
+    <!-- Leaflet, Dynamic Charting, Crossfilter, DataTables,  core JavaScript -->
+    <script src="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.js"></script>
+    <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+    <script src="js/crossfilter.js" charset="utf-8"></script>
+    <script src="js/dc.js" charset="utf-8"></script>
+
+    <!-- Bootstrap core CSS -->
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet">
+    <!-- <link rel="stylesheet" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.11.1/themes/smoothness/jquery-ui.css" /> -->
+
+    <!-- Leaflet, Dynamic Charting, Crossfilter, DataTables, core CSS -->
+    <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.css" />
+    <link rel="stylesheet" href="css/dc.css" />
+
+    <!-- Custom styles for this template -->
+    <link href="css/construxn.css" rel="stylesheet">
+
+    <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+      <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+    <![endif]-->
+  </head>
+
+  <body>
+
+    <div class='col-md-2' id="zipcode-chart">
+      <h6>Zip Code
+        <a class="reset" href="javascript:zipcodeChart.filterAll();dc.redrawAll();" style="display: none;">reset</a>
+      </h6>
+    </div>
+
+    <div class='col-md-3'>
+
+      <div class='row col-md-12' id="permit_type-chart">
+        <h6>Permit Type
+          <a class="reset" href="javascript:permitTypesChart.filterAll();dc.redrawAll();" style="display: none;">reset</a>
+        </h6>
+      </div>
+
+      <div class='row col-md-12' id="city-chart">
+        <h6>City
+          <a class="reset" href="javascript:citiesChart.filterAll();dc.redrawAll();" style="display: none;">reset</a>
+        </h6>
+      </div>
+
+    </div>
+
+    <div class='col-md-7'>
+
+      <div class='row'>
+        <h3>Na$hVega$ Building Permits</h3>
+        <p>Interact with building permit data from the city of Nashville.</p>
+
+        <p>
+        Maybe you're interested in <a href="javascript:permitTypesChart.filter('BUILDING DEMOLITION PERMIT');dc.redrawAll();">demolition permits.</a> Or residents of <a href="javascript:citiesChart.filter('ANTIOCH');dc.redrawAll();">Antioch</a> who are building an <a href="javascript:permitTypesChart.filter('BUILDING RESIDENTIAL - ADDITION');dc.redrawAll();">addition</a> to their home.
+        </p>
+      </div>
+
+      <div class='row'>
+        <div id='map'></div>
+      </div>
+
+      <div class='row'>
+
+        <div class='col-md-7'>
+
+          <div class='row'>
+            <div class='col-md-12' id="date-entered-chart">
+              <h6>#of Applications by Date
+                <a class="reset" href="javascript:dateOfApplicationChart.filterAll();dc.redrawAll();" style="display: none;">reset</a>
+              </h6>
+            </div>
+          </div>
+
+          <div class='row'>
+            <div class='col-md-12' id="date-issuance-chart">
+              <h6>#of Issuances by Date
+                <a class="reset" href="javascript:dateOfIssuanceChart.filterAll();dc.redrawAll();" style="display: none;">reset</a>
+              </h6>
+            </div>
+          </div>
+
+        </div>
+
+        <div class='col-md-5'>
+
+          <div class='col-md-6' id="day-entered-chart">
+            <h6>Application Day
+             <a class="reset" href="javascript:dayEnteredChart.filterAll();dc.redrawAll();" style="display: none;">reset</a>
+            </h6>
+          </div>
+
+          <div class='col-md-6' id="day-issued-chart">
+            <h6>Issuance Day
+             <a class="reset" href="javascript:dayIssuedChart.filterAll();dc.redrawAll();" style="display: none;">reset</a>
+            </h6>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+
+    <script type="text/javascript">
+
+        var map = L.map('map').setView([36.2, -86.8], 10);
+        var markersLayer = new L.LayerGroup(); // NOTE: Layer is created here!
+        //markersLayer.addTo(map);
+
+        // set up the map
+        var osm = L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: 'Map data &copy; <a href="http://google.com">OpenStreetMaps</a> | Building permits from <a href="data.nashville.gov">data.nashville.gov</a>',
+            maxZoom: 18,
+        });
+        osm.addTo(map);
+
+
+        var citiesChart = dc.rowChart("#city-chart");
+        var zipcodeChart = dc.rowChart("#zipcode-chart");
+        var permitTypesChart = dc.rowChart("#permit_type-chart");
+        var dayEnteredChart = dc.rowChart("#day-entered-chart");
+        var dayIssuedChart = dc.rowChart("#day-issued-chart");
+        var dateOfIssuanceChart = dc.barChart("#date-issuance-chart");
+        var dateOfApplicationChart = dc.barChart("#date-entered-chart");
+
+        var commonChartBarColor = '#a1d99b';
+
+        // This is where we will hold our crossfilter data
+        var xdata = null;
+        var all = null;
+        var cities = null;
+        var locations = null;
+
+        var onFilt = function(chart, filter) {
+          //console.log(chart +" , "+ filter);
+          //console.log(locations.top(Infinity).length);
+          updateMap(locations.top(Infinity));
+          //chart.filter(filter);
+        };
+
+        var updateMap = function(datain) {
+          markersLayer.clearLayers();
+          // markersLayer = new L.LayerGroup();
+          // markersLayer.addTo(map);
+
+          datain.forEach( function(d, i) {
+            //console.log(d.ll);
+            if (d.mapped_location.latitude!=null && d.mapped_location.latitude!=undefined) {
+              //console.log(d.mapped_location.latitude +", "+ d.mapped_location.longitude)
+              // console.log(d.date_e.getDay() +", "+ d.date_i.getDay());
+              //d.ll = L.latLng(d.mapped_location.latitude, d.mapped_location.longitude);
+              var mark = L.marker([d.mapped_location.latitude, d.mapped_location.longitude]).bindPopup(d.purpose);
+              markersLayer.addLayer(mark);
+            }
+          });
+          
+        };
+
+        d3.json("http://data.nashville.gov/resource/3h5w-q8b7.json", function(error, data) {
+          var dateFormat = d3.time.format("%Y-%m-%dT%H:%M:%S");
+
+          // Add map markers
+          data.forEach( function(d,i) {
+
+            d.date_e = dateFormat.parse(d.date_entered);
+            d.date_i = dateFormat.parse(d.date_issued);
+            
+            //console.log(d.mapped_location.latitude);
+            if (d.mapped_location.latitude!=null && d.mapped_location.latitude!=undefined) {
+              //console.log(d.mapped_location.latitude +", "+ d.mapped_location.longitude)
+              // console.log(d.date_e.getDay() +", "+ d.date_i.getDay());
+              d.ll = L.latLng(d.mapped_location.latitude, d.mapped_location.longitude);
+              var mark = L.marker([d.mapped_location.latitude, d.mapped_location.longitude]);
+              markersLayer.addLayer(mark);
+            }
+
+            map.addLayer(markersLayer);
+
+          });
+
+          // Construct the charts
+          xdata = crossfilter(data);
+          all = xdata.groupAll();
+
+          cities = xdata.dimension(function (d) { return d.city; });
+          locations = xdata.dimension(function (d) { return d.ll; });
+          var zipcodes = xdata.dimension(function (d) { return d.zip; });
+          var permitTypes = xdata.dimension(function (d) { return d.permit_type_description; });
+
+          var dayOfWeekNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+          var dayOfWeekEntered = xdata.dimension(function (d) {
+            return d.date_e.getDay() + "." + dayOfWeekNames [ d.date_e.getDay() ];
+          });
+          var dayOfWeekIssued = xdata.dimension(function (d) {
+            return d.date_i.getDay() + "." + dayOfWeekNames [ d.date_i.getDay() ];
+          });
+
+          var enteredMonths = xdata.dimension(function (d) { return d3.time.month(d.date_e); });
+          var issuanceMonths = xdata.dimension(function (d) { return d3.time.month(d.date_i); });
+
+          var enteredDates = xdata.dimension(function (d) { return d.date_e; });
+          var issuanceDates = xdata.dimension(function (d) { return d.date_i; });
+
+          citiesChart.width($('#city-chart').innerWidth()-30)
+          .height(250)
+          .colors(commonChartBarColor)
+          .margins({top: 10, left: 20, right: 10, bottom: 20})
+          .group(cities.group())
+          .dimension(cities)
+          .elasticX(true)
+          .on("filtered", onFilt);
+
+          zipcodeChart.width($('#zipcode-chart').innerWidth()-30)
+          .height(window.innerHeight - 50)
+          .colors(commonChartBarColor)
+          .margins({top: 10, left: 10, right: 10, bottom: 20})
+          .group(zipcodes.group())
+          .dimension(zipcodes)
+          .elasticX(true)
+          .on("filtered", onFilt);
+
+          permitTypesChart.width($('#permit_type-chart').innerWidth()-30)
+          .height(400)
+          .colors(commonChartBarColor)
+          .margins({top: 10, left: 20, right: 10, bottom: 20})
+          .group(permitTypes.group())
+          .dimension(permitTypes)
+          .elasticX(true)
+          .on("filtered", onFilt);
+
+          dayEnteredChart.width($('#day-entered-chart').innerWidth()-30)
+          .height(135)
+          .colors(commonChartBarColor)
+          .margins({top: 10, left: 20, right: 10, bottom: 20})
+          .group(dayOfWeekEntered.group())
+          .dimension(dayOfWeekEntered)
+          .label(function (d) {
+              return d.key.split(".")[1];
+          })
+          .title(function (d) {
+              return d.value;
+          })
+          .elasticX(true)
+          .xAxis().ticks(4);
+          dayEnteredChart.on("filtered", onFilt);
+
+          dayIssuedChart.width($('#day-issued-chart').innerWidth()-30)
+          .height(135)
+          .colors(commonChartBarColor)
+          .margins({top: 10, left: 20, right: 10, bottom: 20})
+          .group(dayOfWeekIssued.group())
+          .dimension(dayOfWeekIssued)
+          .label(function (d) {
+              return d.key.split(".")[1];
+          })
+          .title(function (d) {
+              return d.value;
+          })
+          .elasticX(true)
+          .xAxis().ticks(4);
+          dayIssuedChart.on("filtered", onFilt);
+
+          dateOfIssuanceChart.width($('#date-issuance-chart').innerWidth()-30)
+          .height(60)
+          .colors(commonChartBarColor)
+          .margins({top: 10, left: 30, right: 10, bottom: 20})
+          .dimension(issuanceDates)
+          .group(issuanceDates.group(d3.time.day))
+          .x(d3.time.scale().domain([new Date(2014, 6, 1), new Date(2014, 12, 31)]))
+          .round(d3.time.day.round)
+          .xUnits(d3.time.days)
+          .elasticY(true)
+          .elasticX(true)
+          .on("filtered", onFilt);
+          dateOfIssuanceChart.yAxis().ticks(4);
+          dateOfIssuanceChart.xAxis().ticks(4);
+
+          dateOfApplicationChart.width($('#date-entered-chart').innerWidth()-30)
+          .height(60)
+          .colors(commonChartBarColor)
+          .margins({top: 10, left:30, right: 10, bottom: 20})
+          .dimension(enteredDates)
+          .group(enteredDates.group(d3.time.day))
+          .x(d3.time.scale().domain([new Date(2014, 6, 1), new Date(2014, 12, 31)]))
+          .round(d3.time.day.round)
+          .xUnits(d3.time.days)
+          .elasticY(true)
+          .elasticX(true)
+          .on("filtered", onFilt);
+          dateOfApplicationChart.yAxis().ticks(4);
+          dateOfApplicationChart.xAxis().ticks(4);
+
+          dc.renderAll();
+
+        });
+
+    </script>
+
+
+
+    <!-- Bootstrap core JavaScript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.1/jquery-ui.min.js"></script>
+    
+
+  </body>
+</html>
