@@ -37,37 +37,12 @@
 
   <body>
 
-    <div class='col-md-2' id="zipcode-chart">
-      <h6>Zip Code
-        <a class="reset" href="javascript:zipcodeChart.filterAll();dc.redrawAll();" style="display: none;">reset</a>
-      </h6>
-    </div>
-
-    <div class='col-md-3'>
-
-      <div class='row col-md-12' id="permit_type-chart">
-        <h6>Permit Type
-          <a class="reset" href="javascript:permitTypesChart.filterAll();dc.redrawAll();" style="display: none;">reset</a>
-        </h6>
-      </div>
-
-      <div class='row col-md-12' id="city-chart">
-        <h6>City
-          <a class="reset" href="javascript:citiesChart.filterAll();dc.redrawAll();" style="display: none;">reset</a>
-        </h6>
-      </div>
-
-    </div>
-
     <div class='col-md-7'>
 
-      <div class='row'>
-        <h3>Na$hVega$ Building Permits</h3>
-        <p>Interact with building permit data from the city of Nashville.</p>
+      <div class="col-md-12">
+        <h2><span class="label label-default">Nashville Building Permits</span></h2>
+        <p>Explore building permit data from the city of Nashville! Maybe you're interested in <a href="javascript:permitTypesChart.filter('BUILDING DEMOLITION PERMIT');dc.redrawAll();">demolition permits.</a> Or residents of <a href="javascript:citiesChart.filter('ANTIOCH');dc.redrawAll();">Antioch</a> who are building an <a href="javascript:permitTypesChart.filter('BUILDING RESIDENTIAL - ADDITION');dc.redrawAll();">addition</a> to their home.</p>
 
-        <p>
-        Maybe you're interested in <a href="javascript:permitTypesChart.filter('BUILDING DEMOLITION PERMIT');dc.redrawAll();">demolition permits.</a> Or residents of <a href="javascript:citiesChart.filter('ANTIOCH');dc.redrawAll();">Antioch</a> who are building an <a href="javascript:permitTypesChart.filter('BUILDING RESIDENTIAL - ADDITION');dc.redrawAll();">addition</a> to their home.
-        </p>
       </div>
 
       <div class='row'>
@@ -116,21 +91,46 @@
 
     </div>
 
+    <div class='col-md-2' id="zipcode-chart">
+      <h6>Zip Code
+        <a class="reset" href="javascript:zipcodeChart.filterAll();dc.redrawAll();" style="display: none;">reset</a>
+      </h6>
+    </div>
+
+    <div class='col-md-3'>
+
+      <div class='row col-md-12' id="permit_type-chart">
+        <h6>Permit Type
+          <a class="reset" href="javascript:permitTypesChart.filterAll();dc.redrawAll();" style="display: none;">reset</a>
+        </h6>
+      </div>
+
+      <div class='row col-md-12' id="city-chart">
+        <h6>City
+          <a class="reset" href="javascript:citiesChart.filterAll();dc.redrawAll();" style="display: none;">reset</a>
+        </h6>
+      </div>
+
+    </div>
+
 
     <script type="text/javascript">
-
+        // Initialize the Leaflet map and set an initial location and zoom level
         var map = L.map('map').setView([36.2, -86.8], 10);
+        
+        // Create a new group to which we can (later) add or remove our markers / spots on the map
         var markersLayer = new L.LayerGroup(); // NOTE: Layer is created here!
-        //markersLayer.addTo(map);
 
-        // set up the map
+        // Set up the base map tile layer (this is the terrain, imagery, etc)
         var osm = L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: 'Map data &copy; <a href="http://google.com">OpenStreetMaps</a> | Building permits from <a href="data.nashville.gov">data.nashville.gov</a>',
+            attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> | Building permits from <a href="http://data.nashville.gov">data.nashville.gov</a>',
             maxZoom: 18,
         });
+
+        // Add the base map tile layer to the Leaflet map instance
         osm.addTo(map);
 
-
+        // Initialize our dc.js charts, passing the DOM Id in which we want the chart rendered as an argument
         var citiesChart = dc.rowChart("#city-chart");
         var zipcodeChart = dc.rowChart("#zipcode-chart");
         var permitTypesChart = dc.rowChart("#permit_type-chart");
@@ -139,6 +139,7 @@
         var dateOfIssuanceChart = dc.barChart("#date-issuance-chart");
         var dateOfApplicationChart = dc.barChart("#date-entered-chart");
 
+        // A common color for all of the bar and row charts
         var commonChartBarColor = '#a1d99b';
 
         // This is where we will hold our crossfilter data
@@ -147,24 +148,20 @@
         var cities = null;
         var locations = null;
 
+        // Called when dc.js is filtered (typically from user click interaction)
         var onFilt = function(chart, filter) {
-          //console.log(chart +" , "+ filter);
-          //console.log(locations.top(Infinity).length);
           updateMap(locations.top(Infinity));
-          //chart.filter(filter);
         };
 
-        var updateMap = function(datain) {
+        // Updates the displayed map markers to reflect the crossfilter dimension passed in
+        var updateMap = function(locs) {
+          // clear the existing markers from the map
           markersLayer.clearLayers();
-          // markersLayer = new L.LayerGroup();
-          // markersLayer.addTo(map);
 
-          datain.forEach( function(d, i) {
-            //console.log(d.ll);
+          locs.forEach( function(d, i) {
+            
             if (d.mapped_location.latitude!=null && d.mapped_location.latitude!=undefined) {
-              //console.log(d.mapped_location.latitude +", "+ d.mapped_location.longitude)
-              // console.log(d.date_e.getDay() +", "+ d.date_i.getDay());
-              //d.ll = L.latLng(d.mapped_location.latitude, d.mapped_location.longitude);
+              // add a Leaflet marker for the lat lng and insert the application's stated purpose in popup
               var mark = L.marker([d.mapped_location.latitude, d.mapped_location.longitude]).bindPopup(d.purpose);
               markersLayer.addLayer(mark);
             }
@@ -172,32 +169,34 @@
           
         };
 
-        d3.json("http://data.nashville.gov/resource/3h5w-q8b7.json", function(error, data) {
+        // d3's JSON call to grab the JSON data
+        d3.json("http://data.nashville.gov/resource/3h5w-q8b7.json?", function(error, data) {
+          // used by d3's dateFormat to parse the date correctly
           var dateFormat = d3.time.format("%Y-%m-%dT%H:%M:%S");
 
-          // Add map markers
+          // add map markers to map layer
           data.forEach( function(d,i) {
 
             d.date_e = dateFormat.parse(d.date_entered);
             d.date_i = dateFormat.parse(d.date_issued);
             
-            //console.log(d.mapped_location.latitude);
+            // create a map marker if the lat lng is present
             if (d.mapped_location.latitude!=null && d.mapped_location.latitude!=undefined) {
-              //console.log(d.mapped_location.latitude +", "+ d.mapped_location.longitude)
-              // console.log(d.date_e.getDay() +", "+ d.date_i.getDay());
               d.ll = L.latLng(d.mapped_location.latitude, d.mapped_location.longitude);
               var mark = L.marker([d.mapped_location.latitude, d.mapped_location.longitude]);
               markersLayer.addLayer(mark);
             }
 
-            map.addLayer(markersLayer);
-
           });
+
+          // add the markers layer to the map
+          map.addLayer(markersLayer);
 
           // Construct the charts
           xdata = crossfilter(data);
           all = xdata.groupAll();
 
+          // Define the crossfilter dimensions
           cities = xdata.dimension(function (d) { return d.city; });
           locations = xdata.dimension(function (d) { return d.ll; });
           var zipcodes = xdata.dimension(function (d) { return d.zip; });
@@ -217,6 +216,8 @@
 
           var enteredDates = xdata.dimension(function (d) { return d.date_e; });
           var issuanceDates = xdata.dimension(function (d) { return d.date_i; });
+
+          // Start constructing the charts and setting each chart's options
 
           citiesChart.width($('#city-chart').innerWidth()-30)
           .height(250)
