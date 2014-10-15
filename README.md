@@ -3,7 +3,7 @@ Nashville-Building-Permits
 
 What is this?
 -------------
-A mashup project for playing with open building permit data from the City of Nashville.
+A mashup project for playing with open building permit [data from the City of Nashville](https://data.nashville.gov/).
 
 Can I Try It?
 -------------
