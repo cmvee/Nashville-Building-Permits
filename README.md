@@ -15,4 +15,5 @@ This project is primarily intended as a tech demo/mashup of the following techno
 * [Square](http://square.github.io)'s [crossfilter](http://square.github.io/crossfilter/) - for filtering
 * [dc.js](http://dc-js.github.io/dc.js/) - for interactive charts
 * [leaflet.js](http://leafletjs.com/) - for maps
+* [Leaflet.markercluster](https://github.com/Leaflet/Leaflet.markercluster) - for map point clustering
 * [Socrata](http://www.socrata.com/) - for open data
